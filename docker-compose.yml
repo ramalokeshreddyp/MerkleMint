@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  hardhat-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: contracts
+    container_name: nft-hardhat-node
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./cache:/app/cache
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8545', (r) => {if (!r) process.exit(1)})"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    environment:
+      - HARDHAT_NETWORK=hardhat
+    networks:
+      - nft-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+    container_name: nft-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      hardhat-node:
+        condition: service_healthy
+    environment:
+      - NEXT_PUBLIC_CONTRACT_ADDRESS=${NEXT_PUBLIC_CONTRACT_ADDRESS:-0x0000000000000000000000000000000000000000}
+      - NEXT_PUBLIC_RPC_URL=http://hardhat-node:8545
+      - NEXT_PUBLIC_CHAIN_ID=31337
+    networks:
+      - nft-network
+    command: npm run dev
+
+networks:
+  nft-network:
+    driver: bridge
